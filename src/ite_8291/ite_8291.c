@@ -174,7 +174,7 @@ static void color_scaling(struct hid_device *hdev, u8 *red, u8 *green, u8 *blue,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
 	if (dmi_match(DMI_PRODUCT_SKU, "STEPOL1XA04") && hdev->product == 0x600a) {
 		*red = (126 * *red) / 255;
-	} else if (dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") && hdev->product == 0x600a) {
+	} else if ((dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") || dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")) && hdev->product == 0x600a) {
 		*red = (200 * *red) / 255;
 		*blue = (220 * *blue) / 255;
 
@@ -185,7 +185,7 @@ static void color_scaling(struct hid_device *hdev, u8 *red, u8 *green, u8 *blue,
 		}
 	} else if (dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XA05")) {
 		*red = (128 * *red) / 255;
-	} else if (dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") &&
+	} else if ((dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") || dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")) &&
 		   hdev->product == 0xce00 && driver_data->bcd_device == 0x0002) {
 		*red = (255 * *red) / 255;
 		*green = (220 * *green) / 255;
@@ -807,7 +807,7 @@ static int driver_probe_callb(struct hid_device *hdev, const struct hid_device_i
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
 	// Unused device on Stellaris Intel Gen5 (membrane), avoid binding to it
-	if (dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") && hdev->product == 0x5000)
+	if ((dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") || dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")) && hdev->product == 0x5000)
 		return -ENODEV;
 #endif
 
