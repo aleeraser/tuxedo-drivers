@@ -105,7 +105,7 @@ static void color_scaling(struct hid_device *hdev, u8 *red, u8 *green, u8 *blue)
 	if (dmi_match(DMI_PRODUCT_SKU, "STEPOL1XA04") && hdev->product == 0x6010) {
 		*green = (100 * *green) / 255;
 		*blue = (100 * *blue) / 255;
-	} else if (dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") && hdev->product == 0x6010) {
+	} else if ((dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") || dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")) && hdev->product == 0x6010) {
 		*green = (100 * *green) / 255;
 		*blue = (100 * *blue) / 255;
 	} else if (dmi_match(DMI_PRODUCT_SKU, "STELLARIS17I06") && hdev->product == 0x6010) {
@@ -536,7 +536,7 @@ static int driver_probe_callb(struct hid_device *hdev, const struct hid_device_i
 
 	// Unused devices in Stellaris Gen5 models
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
-	if (dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") &&
+	if ((dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") || dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")) &&
 	    !dmi_match(DMI_PRODUCT_FAMILY, "STELLARIS17I05") &&
 	    hdev->product == 0x6010)
 		exclude_device = true;

@@ -211,7 +211,7 @@ static void uw_id_tdp(void)
 	} else if (dmi_match(DMI_PRODUCT_SKU, "STEPOL1XA04")) {
 		tdp_min_defs = tdp_min_gmxrgxx;
 		tdp_max_defs = tdp_max_gmxrgxx;
-	} else if (dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05")) {
+	} else if (dmi_match(DMI_PRODUCT_SKU, "STELLARIS1XI05") || dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")) {
 		tdp_min_defs = tdp_min_gmxpxxx;
 		tdp_max_defs = tdp_max_gmxpxxx;
 	} else if (dmi_match(DMI_PRODUCT_SKU, "POLARIS1XA05")) {
