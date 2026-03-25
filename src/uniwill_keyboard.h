@@ -297,6 +297,8 @@ void uniwill_event_callb(u32 code)
 {
 	switch (code) {
 		case UNIWILL_OSD_MODE_CHANGE_KEY_EVENT:
+			if (dmi_match(DMI_BOARD_NAME, "GM6PX8_9X"))
+				break;
 			// Special key combination when mode change key is pressed (the one next to
 			// the power key). Opens TCC by default when installed.
 			input_report_key(uniwill_keyboard_driver.input_device, KEY_LEFTMETA, 1);
@@ -2167,26 +2169,28 @@ static int uniwill_keyboard_probe(struct platform_device *dev)
 
 	uw_feats = uniwill_get_device_features();
 
-	// FIXME Hard set balanced profile until we have implemented a way to
-	// switch it while tuxedo_io is loaded
-	// uw_ec_write_addr(0x51, 0x07, 0x00, 0x00, &reg_write_return);
-	uniwill_write_ec_ram(0x0751, 0x00);
+	if (!dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")) {
+		// FIXME Hard set balanced profile until we have implemented a way to
+		// switch it while tuxedo_io is loaded
+		// uw_ec_write_addr(0x51, 0x07, 0x00, 0x00, &reg_write_return);
+		uniwill_write_ec_ram(0x0751, 0x00);
 
-	if (uw_feats->uniwill_profile_v1) {
-		// Set manual-mode fan-curve in 0x0743 - 0x0747
-		// Some kind of default fan-curve is stored in 0x0786 - 0x078a: Using it to initialize manual-mode fan-curve
-		for (i = 0; i < 5; ++i) {
-			uniwill_read_ec_ram(0x0786 + i, &data);
-			uniwill_write_ec_ram(0x0743 + i, data);
+		if (uw_feats->uniwill_profile_v1) {
+			// Set manual-mode fan-curve in 0x0743 - 0x0747
+			// Some kind of default fan-curve is stored in 0x0786 - 0x078a: Using it to initialize manual-mode fan-curve
+			for (i = 0; i < 5; ++i) {
+				uniwill_read_ec_ram(0x0786 + i, &data);
+				uniwill_write_ec_ram(0x0743 + i, data);
+			}
 		}
+
+		// Make sure custom TDP/custom fan curve mode is set. Using the
+		// custom profile mode flag to ID this set of devices.
+		uniwill_set_custom_profile_mode(true);
+
+		// Enable manual mode
+		uniwill_write_ec_ram(0x0741, 0x01);
 	}
-
-	// Make sure custom TDP/custom fan curve mode is set. Using the
-	// custom profile mode flag to ID this set of devices.
-	uniwill_set_custom_profile_mode(true);
-
-	// Enable manual mode
-	uniwill_write_ec_ram(0x0741, 0x01);
 
 	// Zero second fan temp for detection
 	uniwill_write_ec_ram(0x044f, 0x00);
