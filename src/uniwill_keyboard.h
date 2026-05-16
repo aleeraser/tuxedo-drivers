@@ -297,8 +297,6 @@ void uniwill_event_callb(u32 code)
 {
 	switch (code) {
 		case UNIWILL_OSD_MODE_CHANGE_KEY_EVENT:
-			if (dmi_match(DMI_BOARD_NAME, "GM6PX8_9X"))
-				break;
 			// Special key combination when mode change key is pressed (the one next to
 			// the power key). Opens TCC by default when installed.
 			input_report_key(uniwill_keyboard_driver.input_device, KEY_LEFTMETA, 1);
@@ -1748,6 +1746,7 @@ struct uniwill_device_features_t *uniwill_get_device_features(void)
 
 	uw_feats->uniwill_custom_profile_mode_needed = false
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
+		|| dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")
 		|| dmi_match(DMI_PRODUCT_SKU, "STELLARIS16I06")
 		|| dmi_match(DMI_PRODUCT_SKU, "STELLARIS17I06")
 		|| dmi_match(DMI_PRODUCT_SKU, "STELLARIS16I07")
