@@ -2179,8 +2179,7 @@ static int uniwill_keyboard_probe(struct platform_device *dev)
 
 	uw_feats = uniwill_get_device_features();
 
-	if (!dmi_match(DMI_BOARD_NAME, "GM6PX8_9X") &&
-	    !dmi_match(DMI_BOARD_NAME, "X6AF559Y")) {
+	if (!dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")) {
 		// FIXME Hard set balanced profile until we have implemented a way to
 		// switch it while tuxedo_io is loaded
 		// uw_ec_write_addr(0x51, 0x07, 0x00, 0x00, &reg_write_return);
