@@ -259,7 +259,8 @@ static void uw_id_tdp(void)
 		tdp_min_defs = tdp_min_x6xx45xu;
 		tdp_max_defs = tdp_max_x6xx45xu;
 	} else if (dmi_match(DMI_BOARD_NAME, "XxAF5xxx") ||
-		   dmi_match(DMI_BOARD_NAME, "XxAF5xxx_mLED")) {
+		   dmi_match(DMI_BOARD_NAME, "XxAF5xxx_mLED") ||
+		   dmi_match(DMI_BOARD_NAME, "X6AF559Y")) {
 		tdp_min_defs = tdp_min_xxaf5xxx;
 		tdp_max_defs = tdp_max_xxaf5xxx;
 #endif

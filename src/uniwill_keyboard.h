@@ -989,7 +989,8 @@ static int is_auto_boot_and_powershare_supported(bool *status)
 
 		  // Stellaris Gen8
 		  dmi_match(DMI_BOARD_NAME, "XxAF5xxx") ||
-		  dmi_match(DMI_BOARD_NAME, "XxAF5xxx_mLED");
+		  dmi_match(DMI_BOARD_NAME, "XxAF5xxx_mLED") ||
+		  dmi_match(DMI_BOARD_NAME, "X6AF559Y");
 
 	return 0;
 }
@@ -1770,6 +1771,7 @@ struct uniwill_device_features_t *uniwill_get_device_features(void)
 		|| dmi_match(DMI_BOARD_NAME, "X5AR45xS")
 		|| dmi_match(DMI_BOARD_NAME, "XxAF5xxx")
 		|| dmi_match(DMI_BOARD_NAME, "XxAF5xxx_mLED")
+		|| dmi_match(DMI_BOARD_NAME, "X6AF559Y")
 #endif
 	;
 
@@ -2177,7 +2179,8 @@ static int uniwill_keyboard_probe(struct platform_device *dev)
 
 	uw_feats = uniwill_get_device_features();
 
-	if (!dmi_match(DMI_BOARD_NAME, "GM6PX8_9X")) {
+	if (!dmi_match(DMI_BOARD_NAME, "GM6PX8_9X") &&
+	    !dmi_match(DMI_BOARD_NAME, "X6AF559Y")) {
 		// FIXME Hard set balanced profile until we have implemented a way to
 		// switch it while tuxedo_io is loaded
 		// uw_ec_write_addr(0x51, 0x07, 0x00, 0x00, &reg_write_return);

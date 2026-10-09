@@ -221,6 +221,11 @@ static const struct dmi_system_id tuxedo_dmi_string_match[] = {
 			DMI_MATCH(DMI_BOARD_NAME, "GM6PX8_9X"),
 		},
 	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_NAME, "X6AF559Y"),
+		},
+	},
 	{ }
 };
 

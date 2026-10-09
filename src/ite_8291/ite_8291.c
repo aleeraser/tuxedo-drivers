@@ -232,7 +232,8 @@ static void color_scaling(struct hid_device *hdev, u8 *red, u8 *green, u8 *blue,
 		*red = (187 * *red) / 255;
 		*blue = (153 * *blue) / 255;
 	} else if (dmi_match(DMI_BOARD_NAME, "XxAF5xxx") ||
-		   dmi_match(DMI_BOARD_NAME, "XxAF5xxx_mLED")) {
+		   dmi_match(DMI_BOARD_NAME, "XxAF5xxx_mLED") ||
+		   dmi_match(DMI_BOARD_NAME, "X6AF559Y")) {
 		// No scaling
 	} else {
 		*green = (126 * *green) / 255;
