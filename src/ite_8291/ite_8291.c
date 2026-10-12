@@ -98,6 +98,7 @@
 #include <linux/dmi.h>
 #include <linux/led-class-multicolor.h>
 #include <linux/of.h>
+#include <linux/workqueue.h>
 
 // USB HID control data write size
 #define HID_DATA_SIZE 8
@@ -122,17 +123,30 @@
 
 #define ITE8291_PARAM_MODE_USER		0x33
 
+/*
+ * A brightness/color change from userspace (e.g. the keyboard backlight hotkey
+ * handled by GNOME/UPower) writes to every one of the per-key LED class
+ * devices. Flushing the whole keyboard over USB HID on each single write makes
+ * such a burst take ~1s per press. Instead coalesce a burst of writes into a
+ * single flush scheduled this many ms after the last write. The burst itself
+ * completes in well under 1 ms, so a small window is enough to collapse it.
+ */
+#define ITE8291_WRITE_COALESCE_MS	5
+
 struct ite8291_driver_data_t {
 	u16 bcd_device;
 	struct hid_device *hid_dev;
 	void *device_data;
 	bool device_has_buffer_input_control;
 	bool device_buffer_input;
+	bool shutting_down;
 	int (*device_add)(struct hid_device *);
 	int (*device_remove)(struct hid_device *);
 	int (*device_write_on)(struct hid_device *);
 	int (*device_write_off)(struct hid_device *);
 	int (*device_write_state)(struct hid_device *);
+	struct workqueue_struct *write_wq;
+	struct delayed_work write_work;
 };
 
 // Per key device specific defines
@@ -166,6 +180,51 @@ static int ite8291_zones_remove(struct hid_device *);
 static int ite8291_zones_write_on(struct hid_device *);
 static int ite8291_zones_write_off(struct hid_device *);
 static int ite8291_zones_write_state(struct hid_device *);
+
+/**
+ * Deferred, coalesced keyboard state flush.
+ *
+ * brightness_set()/multi_intensity writes from userspace arrive once per LED
+ * class device (one per key). Each full flush re-transmits the whole keyboard
+ * over USB HID, so flushing per write turns a single brightness-key press into
+ * a ~1s burst. Queue a single flush instead, pushed forward on every write, so
+ * a burst collapses into one ite8291_write_rows()/zones flush.
+ */
+static void ite8291_write_state_work(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct ite8291_driver_data_t *driver_data =
+		container_of(dwork, struct ite8291_driver_data_t, write_work);
+	struct hid_device *hdev = driver_data->hid_dev;
+
+	if (hdev == NULL || driver_data->device_write_state == NULL)
+		return;
+
+	driver_data->device_write_state(hdev);
+}
+
+static void ite8291_schedule_write_state(struct ite8291_driver_data_t *driver_data)
+{
+	// Userspace is explicitly buffering (via controls/buffer_input) and will
+	// flush itself; do not interfere. Also never (re-)arm the timer once the
+	// device is being torn down: LED class unregistration re-enters
+	// brightness_set() and would otherwise leave a pending timer on memory
+	// that devm is about to free (use-after-free in __run_timers).
+	if (driver_data->device_buffer_input || driver_data->shutting_down ||
+	    !driver_data->write_wq)
+		return;
+
+	mod_delayed_work(driver_data->write_wq, &driver_data->write_work,
+			 msecs_to_jiffies(ITE8291_WRITE_COALESCE_MS));
+}
+
+// devm action: destroy the workqueue on device release / probe failure.
+// destroy_workqueue() cancels and drains any pending (delayed) work, so no
+// timer can outlive driver_data (which devm frees right after).
+static void ite8291_destroy_write_wq_action(void *data)
+{
+	destroy_workqueue((struct workqueue_struct *) data);
+}
 
 /**
  * Color scaling quirk list
@@ -493,8 +552,7 @@ static void leds_set_brightness_mc (struct led_classdev *led_cdev, enum led_brig
 		     mcled_cdev->subled_info[0].intensity, mcled_cdev->subled_info[1].intensity,
 		     mcled_cdev->subled_info[2].intensity);
 
-	if (!ite8291_driver_data->device_buffer_input)
-		ite8291_perkey_write_state(hdev);
+	ite8291_schedule_write_state(ite8291_driver_data);
 }
 
 static int register_leds(struct hid_device *hdev)
@@ -640,7 +698,7 @@ static void leds_zones_set_brightness_mc(struct led_classdev *led_cdev, enum led
 		device_data->mcled_cdevs[i].led_cdev.brightness = brightness;
 	}
 
-	ite8291_zones_write_state(hdev);
+	ite8291_schedule_write_state(driver_data);
 }
 
 static int ite8291_zones_add(struct hid_device *hdev)
@@ -806,8 +864,10 @@ static ssize_t buffer_input_store(struct device *device,
 	if (kstrtobool(buf, &driver_data->device_buffer_input) < 0)
 		return -EINVAL;
 
-	if (!driver_data->device_buffer_input)
+	if (!driver_data->device_buffer_input) {
+		cancel_delayed_work_sync(&driver_data->write_work);
 		driver_data->device_write_state(hdev);
+	}
 
 	return size;
 }
@@ -856,6 +916,20 @@ static int driver_probe_callb(struct hid_device *hdev, const struct hid_device_i
 	if (result != 0)
 		return result;
 
+	// Dedicated ordered workqueue for the coalesced flush. Registered as a
+	// devm action (before the LED class devices below) so that on teardown the
+	// LEDs are unregistered first and destroy_workqueue() then drains/cancels
+	// any pending flush before driver_data is freed.
+	ite8291_driver_data->write_wq = alloc_ordered_workqueue(KBUILD_MODNAME, 0);
+	if (!ite8291_driver_data->write_wq)
+		return -ENOMEM;
+	result = devm_add_action_or_reset(&hdev->dev, ite8291_destroy_write_wq_action,
+					  ite8291_driver_data->write_wq);
+	if (result != 0)
+		return result;
+
+	INIT_DELAYED_WORK(&ite8291_driver_data->write_work, ite8291_write_state_work);
+
 	result = ite8291_driver_data->device_add(hdev);
 	if (result != 0)
 		return result;
@@ -879,6 +953,15 @@ static void driver_remove_callb(struct hid_device *hdev)
 	struct ite8291_driver_data_t *driver_data;
 	pr_debug("driver remove\n");
 	driver_data = hid_get_drvdata(hdev);
+
+	// Stop scheduling new flushes first: unregistering the LED class devices
+	// below re-enters brightness_set() and would otherwise re-arm the timer.
+	// Cancel once here so no flush runs after write_off; the devm action then
+	// calls destroy_workqueue(), which drains anything left before the memory
+	// backing write_work is freed.
+	driver_data->shutting_down = true;
+	cancel_delayed_work_sync(&driver_data->write_work);
+
 	driver_data->device_write_off(hdev);
 	driver_data->device_remove(hdev);
 	if (driver_data->device_has_buffer_input_control)
@@ -893,6 +976,7 @@ static int driver_suspend_callb(struct hid_device *hdev, pm_message_t message)
 	struct ite8291_driver_data_t *driver_data;
 	pr_debug("driver suspend\n");
 	driver_data = hid_get_drvdata(hdev);
+	cancel_delayed_work_sync(&driver_data->write_work);
 	driver_data->device_write_off(hdev);
 	return 0;
 }
